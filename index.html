@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Akatakyie USA Reunion-Frame Maker</title>
+  <link rel="icon" href="./assets/images/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @font-face {
+      font-family: 'OkatakyieFont';
+      src: url('/assets/fonts/ScubaWeb-Extrabold W03 Regular.ttf') format('truetype');
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+    }
+
+    .frame-selector {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .frame-selector img {
+      width: 100px;
+      max-width: 30vw;
+      border: 2px solid transparent;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .frame-selector img.selected {
+      border-color: gold;
+    }
+
+    input[type="file"],
+    input[type="text"],
+    input[type="range"],
+    button {
+      width: 90%;
+      max-width: 400px;
+      margin: 8px auto;
+      padding: 10px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      display: block;
+    }
+
+    canvas {
+      border: 1px solid #444;
+      margin: 20px auto;
+      display: block;
+      max-width: 100%;
+      height: auto;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    footer {
+      margin-top: 40px;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: #aaa;
+      text-decoration: underline;
+    }
+
+    footer a:hover {
+      color: white;
+    }
+
+    /* Loader styles */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #002f6c;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.6s ease;
+    }
+
+    #loader img {
+      max-width: 200px;
+      width: 60vw;
+    }
+
+    /* Toast styles (TOP positioned) */
+    #toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      max-width: 90%;
+    }
+
+    #toast.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loader Screen -->
+  <div id="loader">
+    <img src="./assets/images/logo.png" alt="Reunion Logo">
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast">Welcome! Upload a photo, select a frame, enter your school number, adjust scale if needed, then click 'Download'.</div>
+
+  <h2>Akatakyie USA-Ohio Reunion 2025<br>Frame Generator</h2>
+
+  <div class="frame-selector">
+    <img src="./assets/images/Reunion @Ohio_frame1.png" id="frame1" class="selected" onclick="selectFrame('./assets/images/Reunion @Ohio_frame1.png')">
+    <img src="./assets/images/Reunion @Ohio_frame2.png" id="frame2" onclick="selectFrame('./assets/images/Reunion @Ohio_frame2.png')">
+  </div>
+
+  <input type="file" id="imageUpload" accept="image/*">
+  <input type="text" id="nameInput" placeholder="Enter your school number">
+  <label>Scale Image:</label>
+  <input type="range" id="scaleRange" min="0.5" max="2" step="0.01" value="1">
+
+  <canvas id="canvas"></canvas>
+
+  <button onclick="downloadImage()">Download</button>
+
+  <footer>
+    © FAMARFO DESIGN GROUP · <a href="https://famarfo.com" target="_blank">famarfo.com</a>
+  </footer>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let uploadedImg = null;
+  let frameImg = new Image();
+  let selectedFrame = './assets/images/Reunion @Ohio_frame1.png';
+
+  let nameText = '';
+  let drag = false;
+  let offsetX, offsetY;
+
+  let imgX = 0, imgY = 0;
+  let scale = 1;
+  let baseW = 470, baseH = 470;
+
+  function selectFrame(src) {
+    selectedFrame = src;
+    frameImg.src = src;
+    document.querySelectorAll('.frame-selector img').forEach(img => img.classList.remove('selected'));
+    document.getElementById(src.includes('1') ? 'frame1' : 'frame2').classList.add('selected');
+  }
+
+  frameImg.onload = () => {
+    canvas.width = frameImg.width;
+    canvas.height = frameImg.height;
+
+    baseW = canvas.width * 0.6;
+    baseH = canvas.height * 0.6;
+
+    if (uploadedImg) {
+      imgX = (canvas.width - baseW) / 2;
+      imgY = (canvas.height - baseH) / 2;
+    }
+
+    drawCanvas();
+  };
+  frameImg.src = selectedFrame;
+
+  document.getElementById('nameInput').addEventListener('input', (e) => {
+    nameText = e.target.value;
+    drawCanvas();
+  });
+
+  document.getElementById('scaleRange').addEventListener('input', (e) => {
+    scale = parseFloat(e.target.value);
+    drawCanvas();
+  });
+
+  document.getElementById('imageUpload').addEventListener('change', function (e) {
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      uploadedImg = new Image();
+      uploadedImg.onload = () => {
+        imgX = (canvas.width - baseW * scale) / 2;
+        imgY = (canvas.height - baseH * scale) / 2;
+        drawCanvas();
+      };
+      uploadedImg.src = event.target.result;
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  });
+
+  canvas.addEventListener('mousedown', startDrag);
+  canvas.addEventListener('mousemove', moveImage);
+  canvas.addEventListener('mouseup', endDrag);
+  canvas.addEventListener('mouseleave', endDrag);
+
+  function startDrag(e) {
+    if (!uploadedImg) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const naturalRatio = uploadedImg.width / uploadedImg.height;
+    let imgW = baseW * scale;
+    let imgH = baseH * scale;
+
+    if (naturalRatio > 1) {
+      imgH = imgW / naturalRatio;
+    } else {
+      imgW = imgH * naturalRatio;
+    }
+
+    if (x > imgX && x < imgX + imgW && y > imgY && y < imgY + imgH) {
+      drag = true;
+      offsetX = x - imgX;
+      offsetY = y - imgY;
+      canvas.style.cursor = 'grabbing';
+    }
+  }
+
+  function moveImage(e) {
+    if (!uploadedImg) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (drag) {
+      imgX = x - offsetX;
+      imgY = y - offsetY;
+      drawCanvas();
+    } else {
+      const naturalRatio = uploadedImg.width / uploadedImg.height;
+      let imgW = baseW * scale;
+      let imgH = baseH * scale;
+      if (naturalRatio > 1) {
+        imgH = imgW / naturalRatio;
+      } else {
+        imgW = imgH * naturalRatio;
+      }
+      if (x > imgX && x < imgX + imgW && y > imgY && y < imgY + imgH) {
+        canvas.style.cursor = 'pointer';
+      } else {
+        canvas.style.cursor = 'default';
+      }
+    }
+  }
+
+  function endDrag() {
+    drag = false;
+    canvas.style.cursor = 'grab';
+  }
+
+  function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (uploadedImg) {
+      ctx.save();
+
+      const naturalRatio = uploadedImg.width / uploadedImg.height;
+      let imgW = baseW * scale;
+      let imgH = baseH * scale;
+
+      if (naturalRatio > 1) {
+        imgH = imgW / naturalRatio;
+      } else {
+        imgW = imgH * naturalRatio;
+      }
+
+      ctx.translate(imgX + imgW / 2, imgY + imgH / 2);
+      ctx.drawImage(uploadedImg, -imgW / 2, -imgH / 2, imgW, imgH);
+      ctx.restore();
+    }
+
+    ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+
+    if (nameText) {
+      const boxX = canvas.width * 0.72;
+      const boxY = canvas.height * 0.34;
+      const boxW = canvas.width * 0.15;
+      const boxH = 35;
+
+      ctx.font = 'bold 36px OkatakyieFont';
+      ctx.fillStyle = '#002f6c';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nameText, boxX + boxW / 2, boxY + boxH / 2);
+    }
+  }
+
+  function downloadImage() {
+    const link = document.createElement('a');
+    link.download = 'akatakyie-reunion @ohio-frame.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  window.onload = () => {
+    document.fonts.ready.then(() => {
+      drawCanvas();
+
+      const loader = document.getElementById('loader');
+      const toast = document.getElementById('toast');
+
+      setTimeout(() => {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 600);
+
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 6000);
+
+        console.log("Welcome! Upload a photo, select a frame, enter your school number, adjust scale if needed, then click 'Download'.");
+      }, 2000);
+    });
+  };
+</script>
+
+</body>
+</html>
